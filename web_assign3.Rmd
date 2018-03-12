@@ -1,0 +1,162 @@
+---
+title: "Assignment 3"
+author: "Christina Chang"
+date: "2/21/2018"
+output: html_document
+---
+
+## 0. Preparation: Load Packages
+```{r, message=FALSE}
+library(stringr)
+library(dplyr)
+library(readr)
+library(tm)
+library(SnowballC)
+library(wordcloud)
+library(RColorBrewer)
+```
+
+## 1. The ultimate regular expression
+
+### Find a regular expression that matches any text!
+```{r}
+
+# ".*" 
+# anything zero or more times
+
+# example:
+anytext <- c("hello 234 <p> notebook 80$ </p>")
+
+str_match(anytext,".*")
+```
+
+## 2. Finding strings that are matched by regular expressions
+
+### Describe the types of strings that conform to the following regular expressions and construct an example that is matched by the regular expression.
+
+### a. [0-9]+\$ 
+### b. b[a-z]{1,4} 
+### c. .*?\.txt$ 
+### d. \d{2}/\d{2}/\d{4} 
+### e. <(.+?)>.+?</\1>
+```{r}
+
+str_extract_all("Desk 50$, Pencil 3$", "[0-9]+\\$") # Answer: describes prices in dollars
+
+str_extract_all("brown squirrels burrow berries. dogs dig up bones. birds fly.", "b[a-z]{1,4}") # Answer: describes words that start with the lower case letter 'b' up until the fifth letter.  
+
+file <- c("hello.txt", "goodbye.dta", "nice.txt", "homework.txt")
+
+unlist(str_extract_all(file,".*?\\.txt$")) # Answer: describes all the text files. 
+
+str_extract_all("Chris D. 12/01/1985 Debra E. 09/03/1990", "\\d{2}/\\d{2}/\\d{4}") # Answer: describe dates in DD/MM/YYYY format.
+
+html <- c(" <h3>1. The ultimate regular expression</h3>
+            <p>Find a regular expression that matches any text!</p>
+            <pre class='r'><code># your code here</code></pre>")
+
+str_extract_all(html,"<(.+?)>.+?</\\1>") # Answer: returns html tags and content.
+
+```
+
+## 3. Manipulating an email address
+
+### Consider the mail address datalover89[at]aol[dot]com. Now, complete the following tasks.
+
+### a. Transform the string to a standard mail format (i.e., replace the square brackets with the appropriate symbols) using regular expressions. 
+### b. Now extract the local-part ("datalover89") and the domain ("aol") separately.
+```{r}
+email <- "datalover89[at]aol[dot]com"
+
+(email <- str_replace(email, pattern = "(\\[(at)\\])", replacement = "@"))
+
+(email <- str_replace(email, pattern = "(\\[(dot)\\])", replacement = "."))
+
+(local <- unlist(str_extract_all(email, ".+(?=@)")))
+
+(domain <- unlist(str_extract_all(email, "(?<=@).+(?=\\.)")))
+```
+
+## 4. A secret message
+
+### The following code hides a secret message. Crack it with R and regular expressions. Once you have cracked it, try to collapse the solution in one single string. Hint: Some of the characters are more revealing than others!
+```{r}
+secret <- "clcopCow1zmstc0d87wnkig7OvdicpNuggvhryn92Gjuwczi8hqrfpRxs5Aj5dwpn0TanwoUwisdij7Lj8kpf03AT5Idr3coc0bt7yczjatOaootj55t3Nj3ne6c4Sfek.r1w1YwwojigOd6vrfUrbz2.2bkAnbhzgv4R9i05zEcrop.wAgnb.RqoE65fGEa1otfb7wXm24k.6t3sH9zqe5fy89n6Ed5t9kc4fR905gmc4Ogxo5nhk!gr"
+
+(cracked <- str_extract_all(secret,("[:upper:]")) %>%  unlist() %>% paste(.,collapse = " "))
+```
+
+## 5. Inspecting Trump's tweets
+
+### The following code gives you access to a dataset of Donald Trump tweets that he posted over the course of the 2016 election campaign. Focus on the Tweet_Text variable and come up with your own shot at this data. Requirement: Use at least 3 different regular expressions and 3 different functions from the stringr package for your analysis!
+```{r, message=FALSE, warning=FALSE}
+trump_df <- read_csv("https://raw.githubusercontent.com/Currie32/Tweet-Like-Trump/master/tweets.csv")
+
+trump_tweets <- trump_df$Tweet_Text
+
+# HANDLES
+
+handle <- unlist(str_extract_all(trump_tweets,"(@\\w+)"))
+
+myCorpus_handle <-  Corpus(VectorSource(handle)) %>% 
+  tm_map(removePunctuation) %>% 
+  tm_map(stripWhitespace)
+
+dtm1 <- TermDocumentMatrix(myCorpus_handle)
+m1 <- as.matrix(dtm1)
+v1 <- sort(rowSums(m1),decreasing=TRUE)
+d1 <- data.frame(word = names(v1),freq=v1)
+
+head(d1)
+
+pal2 <- brewer.pal(8,"Dark2")
+
+# NOTE: realdonaldtrump could not be fit on page. It will not be plotted.
+wordcloud(d1$word,d1$freq, scale=c(3,.4), min.freq=15,
+         max.words=50, random.order=FALSE, rot.per=.03, colors=pal2)
+
+# HASHTAGS
+
+hashtag <-unlist(str_extract_all(trump_tweets,"#\\w+"))
+
+myCorpus_hashtag <-  Corpus(VectorSource(hashtag)) %>% 
+  tm_map(removePunctuation) %>% 
+  tm_map(stripWhitespace)
+
+dtm2 <- TermDocumentMatrix(myCorpus_hashtag)
+m2 <- as.matrix(dtm2)
+v2 <- sort(rowSums(m2),decreasing=TRUE)
+d2 <- data.frame(word = names(v2),freq=v2)
+
+head(d2)
+
+set.seed(1234)
+
+wordcloud(d2$word,d2$freq, scale=c(3,.4), min.freq=15,
+          max.words=50, random.order=FALSE, rot.per=.035, colors=pal2)
+
+# WORDS
+
+text <-gsub("#\\w+","",trump_tweets)
+
+text <-gsub("@\\w+","",text)
+
+myCorpus_text <-  Corpus(VectorSource(text)) %>% 
+  tm_map(tolower) %>% 
+  tm_map(removePunctuation) %>% 
+  tm_map(removeNumbers) %>% 
+  tm_map(removeWords, stopwords("english")) %>% 
+  tm_map(stripWhitespace)
+
+dtm3 <- TermDocumentMatrix(myCorpus_text)
+m3 <- as.matrix(dtm3)
+v3 <- sort(rowSums(m3),decreasing=TRUE)
+d3 <- data.frame(word = names(v3),freq=v3)
+
+head(d3)
+
+set.seed(1234)
+
+wordcloud(words = d3$word,freq = d3$freq, min.freq = 20, max.words=100,
+          random.order=FALSE, rot.per = .035, use.r.layout=FALSE, colors =pal2)
+```
