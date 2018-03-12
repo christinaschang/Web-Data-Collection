@@ -1,0 +1,129 @@
+---
+title: "Assign4"
+author: "Christina Chang"
+date: "2/28/2018"
+output: html_document
+---
+### 0. Preparation: Load packages
+```{r, message=FALSE}
+library(rvest)
+library(stringr)
+library(dplyr)
+library(tm)
+```
+
+### 1. Getting information out of an XML file
+
+The file potus.xml, available at http://www.r-datacollection.com/materials/ch-4-xpath/potus/potus.xml, provides information on past presidents of the United States.
+
+a. Import the file into R using read_xml(), which works like read_html()---just for XML files. b. Extract the nicknames of all presidents, store them in a vector nicknames, and present the first 5 elements of this vector. (Hint: instead of html_nodes() and html_text(), you will need the corresponding functions for XML documents.) c. Which religious denomiation is represented most frequently among the former presidents? d. Extract the occupation values of all presidents who happened to be Baptists.
+
+```{r}
+url1 <- "http://www.r-datacollection.com/materials/ch-4-xpath/potus/potus.xml"
+
+url1_parsed <- read_xml(url1)
+
+nicknames <- xml_nodes(url1_parsed, xpath = "//nickname") %>% xml_text()
+
+head(nicknames)
+
+religion <- xml_nodes(url1_parsed, xpath = "//religion") %>% xml_text()
+
+table(religion) %>% sort(.,decreasing = TRUE)
+```
+Episcopalian is the most frequently represented denomination among former presidents.
+```{r}
+baptist_occup <- html_nodes(url1_parsed, xpath = "//religion[contains(text(), 'Baptist')]/preceding-sibling::occupation") %>% xml_text()
+
+baptist_occup <- strsplit(baptist_occup,", ") %>% 
+  unlist() 
+
+table(baptist_occup)
+```
+
+### 2. Scraping newspaper headlines
+
+Use Selectorgadget and R to scrape the article headlines from https://www.theguardian.com/international.
+
+a. Present the first 6 observations from the uncleaned vector of scraped headlines. b. Tidy the text data (e.g., remove irrelevant characters if there are any, and get rid of duplicates). c. Identify the 5 most frequent words in all headlines. (Hint: use a string processing function from the stringr package to split up the headings word by word, and use an empty space, " ", as splitting pattern.)
+
+```{r}
+url2 <- "https://www.theguardian.com/international"
+
+xpath2 <-  '//*[contains(concat( " ", @class, " " ), concat( " ", "js-headline-text", " " ))]'
+
+url2_parsed <- read_html(url2)
+
+df <- html_nodes(url2_parsed, xpath = xpath2) %>% html_text()
+
+head(df)
+
+df <- paste(df[-which(duplicated(df))])
+
+head(df)
+
+df_words <- strsplit(df, " ") %>% 
+  unlist() %>% 
+  tolower() %>% 
+  gsub("[[:punct:]]","",.) %>% 
+  gsub("[[:digit:]]","",.)
+
+head(sort(table(df_words),decreasing=TRUE))
+```
+These words are common filler words in the English language. 
+
+```{r}
+myCorpus_words <-  Corpus(VectorSource(df_words)) %>% 
+  tm_map(removeWords, stopwords("english")) %>% 
+  tm_map(stripWhitespace)
+
+dtm3 <- TermDocumentMatrix(myCorpus_words)
+m3 <- as.matrix(dtm3)
+v3 <- sort(rowSums(m3),decreasing=TRUE)
+d3 <- data.frame(word = names(v3),freq=v3)
+
+head(d3)
+```
+These are the most common substantive words in the headlines. 
+
+### 3. Skyscrapers of the world
+
+Scrape the table "Buildings under construction" from https://en.wikipedia.org/wiki/List_of_tallest_buildings_in_the_world.
+
+a. Present the first 6 rows of the generated data frame.
+
+b. How many of those buildings are currently built in China? Use table() to present the result!
+
+c. In which city are most of the tallest buildings currently built?
+
+d. What is the sum of the planned architectural height of all those skyscrapers?
+```{r}
+url3 <- "https://en.wikipedia.org/wiki/List_of_tallest_buildings"
+
+url3_parsed <- read_html(url3)
+
+tables <- html_table(url3_parsed, header = TRUE, fill = TRUE)
+
+buildings <- tables[[6]]
+
+head(buildings)
+
+table(buildings$Country) %>% sort(.,decreasing = TRUE)
+```
+21 buildings are currently built in China.
+
+```{r}
+table(buildings$City) %>% sort(.,decreasing = TRUE)
+```
+New York City has the most tallest buildings currently being built.
+
+```{r}
+buildings$`Planned height(m)` <- str_extract_all(buildings$`Planned architectural height`, "^\\d+\\W?\\d+")
+
+buildings$`Planned height(m)` <- gsub(",","", buildings$`Planned height(m)`) 
+
+buildings$`Planned height(m)` <- as.numeric(buildings$`Planned height(m)`)
+
+sum(buildings$`Planned height(m)`)
+```
+The sum of the planned architectural height of all the skyscrapers is 18,830 meters.

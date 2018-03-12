@@ -1,0 +1,139 @@
+---
+title: "Assignment 2"
+author: "Christina Chang"
+date: "2/16/2018"
+output: html_document
+---
+
+#### 0. Load Packages
+```{r, message=FALSE}
+library(rvest)
+library(stringr)
+library(nycflights13)
+library(dplyr)
+```
+
+## 1. Loops and Split-Apply-Combine
+
+### a. Identify the class of all the variables using an appropriate apply command. Explain why the output is not a character vector. 
+
+```{r}
+lapply(flights, class)
+```
+
+#### The output is not a character vector because the lapply function always returns a list. 
+
+### b. Select all numeric variables and store them in a new data frame flights_sub.
+
+```{r}
+flights_sub <- flights %>% 
+  select_if(is.numeric)
+```
+
+### c. Compute the variable means of flights_sub, discarding all NA values. The result should be stored in a numeric vector.
+
+```{r}
+flights_mean <- flights_sub %>% 
+  apply(2, mean, na.rm = TRUE)
+```
+
+### d. Use the lapply() function together with an anonymous function to center all variables of flights_sub (i.e., they should have mean 0). Then, check whether you succeeded with another of the apply functions.
+
+```{r}
+flights_center <- lapply(flights_sub, function(x) x - mean (x, na.rm = TRUE))
+
+sapply(flights_center, mean, na.rm = TRUE)
+```
+
+#### Only the mean of the year variable returns zero. For all other variables, the mean results are close to zero but not exactly zero. 
+
+## 2. Downloading and managing files
+##### Go to the webpage of the Comparative Study of Electoral Systems (CSES) and check out the Module 4, which comprises election surveys launched 2011-2016 (http://www.cses.org/datacenter/module4/module4.htm). The following piece of code identifies all links to resources on the webpage and selects the subset of links that refers to the survey questionnaire PDFs. With this at hand, try to solve the following tasks.
+
+### a. Set up a folder "data/cses-pdfs".
+
+```{r}
+(current_folder <- getwd())
+
+Dir <- "/Users/Berlin/"
+
+ifelse(!dir.exists(file.path(Dir,"data/cses-pdfs")),
+       dir.create(file.path(Dir,"data/cses-pdfs")), FALSE)
+```
+#### Returned FALSE so directory already exists. 
+
+### b. Download the first 10 of the survey questionnaire PDFs into that folder using a for loop and the download.file() function. 
+
+```{r, eval=FALSE}
+
+setwd("/Users/Berlin/data/cses-pdfs")
+# I understand using setwd() is a bad practice, but I was not sure how to change the directory where the PDFs are saved. 
+
+url <- "http://www.cses.org/datacenter/module4/module4.htm"
+
+page_links <- read_html(url) %>% html_nodes("a") %>% html_attr("href")
+
+survey_pdfs <- str_subset(page_links,"/survey")
+
+pdfstocollect <-paste("http://www.cses.org", survey_pdfs, sep="")
+
+for (i in 1:10) {
+  download.file(pdfstocollect[i], basename(pdfstocollect[i]))
+}
+```
+
+### c. Check if the number of files in the folder corresponds with the number of downloads and list the names of the files. 
+```{r}
+
+filenames <- dir("/Users/Berlin/data/cses-pdfs", full.names = TRUE)
+
+length(filenames)
+
+filenames
+```
+
+### d. Inspect the files. Which is the largest one?
+```{r}
+file.size(filenames)
+```
+#### The fifth file is the largest, which is the untranslated Bulgarian pdf. 
+
+## 3. Crafting your own functions
+
+### a. Program a function ultimateAnswer() that always returns the number 42! 
+```{r}
+ulimateAnswer <- function(x){
+  if (mode(x)=="character") {
+    result <- 42
+  }
+  else if (mode(x)=="list"){
+    result <- 42
+  }
+  else if (mode(x)=="numeric"){
+    result <- 42
+  }
+  else if (mode(x)=="logical"){
+    result <- 42
+  }
+  return(result)
+}
+```
+
+### b. Program a function normalize() that normalizes a numeric vector x to mean(x) = 0 and sd(x) = 1! 
+
+```{r}
+normalize <- function(x){
+  (x-mean(x, na.rm = TRUE))/sd(x, na.rm = TRUE)
+}
+```
+
+### c. Use integrate() and an anonymous function to find the area under the curve for the following functions:
+#### y = x ^ 2 - x, x in [0, 10]
+#### y = sin(x) + cos(x), x in [-pi, pi]
+
+```{r}
+integrate(function(x) x^2 - x, 0, 10)
+
+integrate(function(x) abs(sin(x) + cos(x)), -pi, pi)
+```
+

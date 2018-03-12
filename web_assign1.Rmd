@@ -1,0 +1,100 @@
+---
+title: "Assignment 1"
+author: "Christina Chang"
+date: "2/9/2018"
+output: html_document
+---
+
+# 1. NYC flights
+```{r}
+library(nycflights13) # load package
+```
+
+## a. How many variables and observations does the data.frame "flights" from the nycflights13 package contain? 
+```{r}
+ncol(flights) # variables
+
+nrow(flights) # observations
+```
+
+## b. Select the flights that started from NYC at the first day of each month! 
+```{r, message=FALSE}
+library(dplyr) # to manipulate data
+
+flights_sub <- filter(flights, 
+                      origin == c("LGA","JFK"), # EWR is technically outside NYC
+                      day == 1)
+```
+
+## c. Sort flights by time of arrival! 
+```{r}
+flights_sub <- arrange(flights, desc(arr_time))
+```
+
+## d. How many flights started from all the NYC airports in 2013? 
+```{r}
+flights %>%  
+  filter(origin == c("LGA","JFK"), # again EWR not included (see above reasoning)
+         year == 2013) %>%
+  nrow()
+```
+
+## e. Which carrier had the biggest mean net delay (departure delay minus arrival delay), which the lowest? 
+```{r}
+flights <- mutate(flights, net_delay = dep_delay + arr_delay)
+
+flights_by_carrier <- group_by(flights, carrier)
+
+summarize(flights_by_carrier, net_delay = mean(net_delay, na.rm = TRUE))
+```
+### F9 is the carrier with biggest mean net delay
+### AS is the carrier with lowest mean net delay
+
+## f. Inspect visually how the net delays are distributed!
+```{r}
+hist(flights$net_delay, 
+     main="Histogram of Net Delay",
+     xlab="Net Delay",
+     col="red")
+```
+
+# 2. Baby names
+```{r}
+library(babynames)
+```
+
+## a. Which time period does the data frame cover? 
+```{r}
+str(babynames)
+summary(babynames$year)
+```
+### From 1880 to 2015. 
+
+## b. What has been the most frequent name in the US since 1880? 
+```{r}
+babynames2 <- babynames %>% 
+  group_by(name) %>% 
+  summarise(nrow = length(name)) %>% 
+  arrange(desc(nrow))
+
+head(babynames2)
+
+babynames2[babynames2$nrow==272, "name"]
+```
+
+## c. Use graphical means to determine since which year the name "Kim" became more popular as a female than a male name! 
+```{r}
+female_Kim <- babynames %>% 
+  filter(sex == "F", name == "Kim")
+
+plot(female_Kim$year, female_Kim$n, type="l",col="green")
+
+male_Kim <- babynames %>%
+  filter(sex == "M", name == "Kim")
+
+lines(male_Kim$year, male_Kim$n,col="red")
+
+
+```
+
+### It looks like 1955 is the year that "Kim" became more popular as a female than a male name. 

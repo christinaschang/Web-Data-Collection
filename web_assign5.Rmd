@@ -1,0 +1,212 @@
+---
+title: "Assign5"
+author: "Christina Chang"
+date: "3/9/2018"
+output: html_document
+---
+### 0. Preparation: Load packages
+```{r, message=FALSE}
+library(rvest)
+library(stringr)
+library(magrittr)
+library(httr)
+library(ggmap)
+library(maps)
+library(reshape2)
+library(zoo)
+library(sp)
+```
+
+```{r setup, include=FALSE}
+ knitr::opts_knit$set(root.dir = '/Users/Berlin/data/wiki')
+```
+
+### 1. Downloading HTML files from Wikipedia
+
+Continuing with the task from the last assignment (getting data from https://en.wikipedia.org/wiki/List_of_tallest_buildings), the goal is now to download the Wikipedia pages behind the links that lead to the articles on the buildings under construction. To that end,
+
+a. create a set of links referring to these buildings from the first column of the table, b. create a folder "skyscraper_htmls", and c. download the HTML files to that folder.
+
+In completing these tasks, implement a server-friendly scraping workflow. Finally, check the number of files in that folder.
+
+```{r, message=FALSE, warning=FALSE}
+url1 <- "https://en.wikipedia.org/wiki/List_of_tallest_buildings"
+url1_parsed <- read_html(url1)
+tables1 <- html_table(url1_parsed, header = TRUE, fill = TRUE)
+buildings <- tables1[[6]]
+nrow(buildings)
+
+baseurl1 <- "https://en.wikipedia.org/wiki/"
+bldg_url <- paste0(buildings$Building)
+bldg_url <- gsub("\\s","_",bldg_url)
+
+urls_list1 <- paste0(baseurl1, bldg_url)
+names1 <- paste0(bldg_url, ".html")
+
+tempwd <- ("/Users/Berlin/data/wiki")
+dir.create(tempwd)
+setwd(tempwd)
+folder1 <- "skyscraper_htmls/"
+dir.create(folder1)
+
+for (i in 1:length(urls_list1)) {
+  try(
+  if (!file.exists(paste0(folder1, names1[i]))) {
+    download.file(urls_list1[i], destfile = paste0(folder1, names1[i]))
+    Sys.sleep(runif(1, 0, 1))
+  })
+}
+
+list_files1 <- list.files(folder1, pattern = ".*")
+length(list_files1) # number of files in folder
+setdiff(names1,list_files1) # files in wiki table that are missing in the folder
+```
+
+
+### 2. Creating a map of world capitals
+
+Take a look at https://en.wikipedia.org/wiki/List_of_national_capitals_in_alphabetical_order and complete the following tasks:
+
+a. Extract the geographic coordinates of each European country capital (no API use; stay on the Wikipedia platform to gather the needed information). b. Using these coordinates, visualize the capitals on a map using the maps package.
+
+```{r, eval=FALSE}
+browseURL("https://en.wikipedia.org/wiki/List_of_national_capitals_in_alphabetical_order")
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+url2 <- "https://simple.wikipedia.org/wiki/List_of_European_countries"
+# to get list of European capitals
+# note: if you click on the European capital on this page, you get a simple wiki page which does not provide coordinates
+url2_parsed <- read_html(url2)
+tables2 <- html_table(url2_parsed, header = TRUE, fill = TRUE)
+capitals_Europe <- tables2[[1]]
+nrow(capitals_Europe)
+
+capital_url <- paste0(capitals_Europe$Capital)
+capital_url <- gsub("\\s","_",capital_url)
+
+urls_list2 <- paste0(baseurl1, capital_url)
+names2 <- paste0(capital_url, ".html")
+length(names2)
+
+folder2 <- "capital_htmls/"
+dir.create(folder2)
+
+for (i in 1:length(urls_list2)) {
+  try(
+    if (!file.exists(paste0(folder2, names2[i]))) {
+      download.file(urls_list2[i], destfile = paste0(folder2, names2[i]))
+      Sys.sleep(runif(1, 0, 1))
+    }) 
+  }
+
+list_files2 <- list.files(folder2, pattern = ".*")
+
+length(list_files2)
+
+xpath_capital <- '//*[(@id = "firstHeading")]'
+xpath_coord <- '//*[contains(concat( " ", @class, " " ), concat( " ", "geo-dms", " " ))]'
+
+capital <- character()
+coordinates <- character()
+
+for (i in 1:length(list_files2)) {
+  html_out <- read_html(list_files2[i])
+  capital[i] <- html_nodes(html_out, xpath = xpath_capital) %>% html_text()
+  coordinates[i] <- html_nodes(html_out, xpath = xpath_coord) %>% html_text()
+}
+
+dat <- data.frame(capital = capital, coordinates = coordinates, stringsAsFactors = FALSE)
+
+dat$Lat_dms <- str_extract_all(dat$coordinates,"^.*N")
+dat$Long_dms <- str_extract_all(dat$coordinates,"\\s(.*)(E|W)$")
+
+dat$Lat <- as.numeric(char2dms(dat$Lat_dms, chd="°", chm = "′", chs="″"))
+dat$Long <- as.numeric(char2dms(dat$Long_dms, chd="°", chm = "′", chs="″"))
+
+map.europe <- map_data("world")
+
+ggplot() +
+  geom_polygon(data = map.europe, aes(x = long, y = lat, group = group)) +
+  geom_point(data = dat, aes(x = Long, y = Lat), 
+             color = "red", alpha = .3) +
+  coord_cartesian(xlim = c(-9,45), ylim = c(32,70))  
+```
+
+### 3. Querying the Academy Awards Acceptance Speech Database
+
+Go to http://aaspeechesdb.oscars.org/ and use R to search the database for occurrences of "woman" or "women" in speeches by male actors in a supporting or leading role. Parse the output (year of the speech given plus actor/movie) into one data frame and print it out!
+
+```{r} 
+session <- html_session("http://aaspeechesdb.oscars.org/")
+
+url_parsed3 <- read_html("http://aaspeechesdb.oscars.org/")
+
+search <- html_form(url_parsed3)[[2]]
+
+form1 <- set_values(search, QI5 = "women")
+form2 <- set_values(search, QI5 = "woman")
+
+session
+
+speech_search1 <- submit_form(session, form1)
+speech_search2 <- submit_form(session,form2)
+
+url_parsed4 <- read_html(speech_search1)
+url_parsed5 <- read_html(speech_search2)
+
+
+everything1 <- html_nodes(url_parsed4, xpath = '//*[(@id = "main")]') %>% html_text()
+everything2 <- html_nodes(url_parsed5, xpath = '//*[(@id = "main")]') %>% html_text()
+
+colsplit(string=everything1, pattern="\n\r\n\r\n \r\n", names=c("content1", "content2"))
+colsplit(string=everything2, pattern="\n\r\n\r\n \r\n", names=c("content1", "content2"))
+
+df1 <- data.frame()
+df2 <- data.frame()
+
+df1 <- str_split(everything1[[1]], "\r\n\r\n\r\n\r\n \r\n") %>% unlist(.)
+df2 <- str_split(everything2[[1]], "\r\n\r\n\r\n\r\n \r\n") %>% unlist(.)
+
+df1<- as.data.frame(df1, stringAsFactor=FALSE)
+df2<- as.data.frame(df2, stringAsFactor=FALSE)
+
+df1 <-df1[-1,]
+df2 <-df2[-1,]
+
+df1<- as.data.frame(df1, stringAsFactor=FALSE)
+df2<- as.data.frame(df2, stringAsFactor=FALSE)
+
+colnames(df1) <- c("movie")
+colnames(df2) <- c("movie")
+
+df3 <- rbind(df1,df2)
+
+df3$year <- str_extract_all(df3$movie,"^[:digit:].*Academy Awards")
+
+df3$year <- as.character(df3$year)
+df3$year[df3$year == "character(0)"] <- NA
+df3$year <- na.locf(df3$year)
+
+df3$movie <- str_replace(df3$movie,"^[:digit:].*Academy Awards","")
+
+df3$award <- str_extract_all(df3$movie,".*--")
+df3$award  <- as.character(df3$award)
+df3$award <- str_replace(df3$award,"--","")
+df3$movie <- str_replace(df3$movie,".*--","")
+
+grep("Actor", df3$award)
+
+df3 <-df3[-c(1:15,17:34,36:70,72:77,80:81,83:85,87:88,89:104),]
+
+df3$actor <- str_extract_all(df3$movie,";.*$")
+df3$actor <- str_replace(df3$actor,"; ","")
+df3$movie <- str_replace(df3$movie,";.*$","")
+
+# Tom Hanks is a duplicate
+
+df3 <- df3[-c(2),]
+
+print(df3)
+```
