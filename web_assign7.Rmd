@@ -1,0 +1,105 @@
+---
+title: "web_assign7"
+author: "Christina Chang"
+date: "3/25/2018"
+output: html_document
+---
+
+### 0. Preparation: Load packages
+
+```{r setup, message=FALSE}
+library(pageviews)
+library(ggplot2)
+library(WikipediaR)
+library(xml2)
+```
+
+### 1. Accessing Wikipedia data
+
+The Wikimedia REST API provides access to Wikimedia content and data in machine-readable formats.
+
+a. Familiarize yourself with the API by studying the documentation at https://wikimedia.org/api/rest_v1/. The Wikimedia Services team expects you to specify responsible queries. How should your queries look like in order to comply to the rules? (Answer in a couple of sentences) b. One of the endpoints provides access to the pageview counts of a given Wikipedia article in a given date range. Give the request URL for an example query of this endpoint! You can freely choose all available parameters. c. The pageviews package is an R client of the pageviews endpoint of the Wikimedia REST API. Check out how the package works. Then, specify two queries - one for the article on Donald Trump and one for Hillary Clinton on the English Wikipedia between January and December 2016. Based on the data returned by the API, plot both time-series of pageviews against each other! d. The WikipediR package provides access to more content on single Wikipedia pages. Check out its functionality and use it to find out content and metadata features of the article on Donald Trump in the English Wikipedia. Use at least 4 different functions from the package in your exploration of the data!
+
+Use this HTML snippet to answer the first couple of questions.
+```{r}
+# Access is free and limited up to 200 requests per second with more specific usage limits at each API end point. They request users set a unique User-Agent or Api-User-Agent header (e.g. email address). To access the API, we have to send a GET or POST request to https://wikimedia.org/api/rest_v1/.
+
+# I decided to look at page views for Linda Sarsour, a Muslim-American activist whose early activism include defending the civil rights of Muslims in the U.S. following the September 11 attacks of 2001. 
+
+# https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia.org/all-access/all-agents/Linda_Sarsour/daily/20010911/20180325
+
+# note: Within the response body, the first timestamp for page views is 2015080900. 
+
+
+trump <- article_pageviews(project = "en.wikipedia.org",
+                               article = "Donald_Trump", 
+                               start = as.Date("2016-01-01"),
+                               end = as.Date("2016-12-01"),
+                               user_type = c("all-agents"),
+                               platform = c("all-access"))
+
+clinton <- article_pageviews(project = "en.wikipedia.org",
+                            article = "Hillary_Clinton", 
+                            start = as.Date("2016-01-01"),
+                            end = as.Date("2016-12-01"),
+                            user_type = c("all-agents"),
+                            platform = c("all-access"))
+
+df1 <- rbind(trump,clinton)
+
+ggplot(df1,aes(x=date,y=views,color=article)) + 
+  geom_line()
+
+# wikipedia pages that link to the page about Donald Trump
+bl.Trump <- backLinks(domain ="en", page = "Donald_Trump")
+# in how many main pages and discussions this page is linked?
+table(bl.Trump$backLinks$nscat)
+
+# provide the list of the contributions of a wikipedia page
+contribs.Trump <- contribs(page = "Donald_Trump", domain = "en")
+# who are the contributors?
+head(table(contribs.Trump$contribs$user))
+
+# lists all links (to wikipedia and to external url) that are present in a specific wikipedia page.
+links.Trump <- links(page = "Donald_Trump", domain = "en")
+head(table(links.Trump$links$title))
+
+# lists contributions for a specific user
+
+AAAEditor.Contribs <- userContribs(user.name = "AnAwesomeArticleEditor", domain = "en")
+head(table(AAAEditor.Contribs$contribs$comment))
+
+```
+
+### 2. Checking the current weather with the OpenWeatherMap API
+
+OpenWeatherMap (http://openweathermap.org/) is a service that provides (partly for free) weather data.
+
+a. Familiarize yourself with the API for current weather data at http://openweathermap.org/current. Give the request URL for an example query that asks for the current weather in Paris, Texas, in imperial units, French language, and XML format! Use a fictional API key to complete your URL. b. Sign up for the API (for free!) at http://openweathermap.org/api and store the API key in a local .RData file. (Important: You don't have to give proof for this step. In particular, you don't have to show how you store the key - I don't want to see it in the script!!) c. Import the key into R and construct a query that retrieves the current weather conditions in Cape Town, South Africa. Prepare the output as a data.frame object (presumably with one observation) and print it out. d. Finally, build a function getOpenWeather() that has the parameters apikey, location, and units, and that lets you automatically perform a query to the OpenWeatherMap API for the current weather conditions given valid values for the parameters. Test it with a couple of examples!
+
+```{r}
+#2.d.
+# http://api.openweathermap.org/data/2.5/weather?q=Paris,US&units=imperial&mode=xml&APPID==1111111111&lang=fr
+
+```
+
+```{r}
+#2.c.
+apikey <- readRDS("api_key_openmaps.rds")
+url <- "http://api.openweathermap.org/data/2.5/weather?"
+query <- paste0(url,"q=Cape Town,ZA&APPID=",apikey)
+Cape_Town_parsed <- jsonlite::fromJSON(query) %>% as.data.frame(stringsAsFactors = FALSE)
+
+Cape_Town_parsed
+
+#2.d
+getOpenWeather <- function(x, apikey,location, units) {
+  url <- "http://api.openweathermap.org/data/2.5/weather?"
+  query <- paste0(url,"q=",location,"&units=", units,"&APPID=", apikey)
+  jsonlite::fromJSON(query)%>%as.data.frame(stringsAsFactors = FALSE)
+}
+
+# test
+getOpenWeather(NYC,apikey,"New York,US","celsius")
+getOpenWeather(Berlin,apikey,"Berlin,DE","kelvin")
+```

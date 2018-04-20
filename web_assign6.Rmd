@@ -1,0 +1,135 @@
+---
+title: "web_assign6"
+author: "Christina Chang"
+date: "3/15/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = '/Users/Berlin/Data')
+```
+
+### 0. Preparation: Load Packages
+```{r message=FALSE}
+library(RSelenium)
+library(readr)
+library(ggplot2)
+library(plotly)
+library(robotstxt)
+```
+
+### 1. Accessing data from a dynamic webpage
+
+Note: If you are not able to get this code compiled using knitr, or if you fail at setting up Selenium on your machine, simply document your code and set eval = FALSE in the code snippet header.
+
+In the following, use RSelenium together with Selenium to run a search query on Google Trends. To that end, implement the following steps:
+
+a. Launch a Selenium driver session and navigate to "https://trends.google.com/trends/". b. Run a search for "data science". c. Once you are on the Results page, add another keyword for comparison, "rocket science". You might need the sendKeysToActiveElement() function together with the key = "enter" functionality to get this running. Important note: this step causes trouble when knitting the document. Just write down the needed lines and then comment them out before knitting. d. Download the CSV file that contains the data on the interest in these terms over time. e. Store the live DOM tree in an HTML file on your local drive. f. Close the connection. g. Parse the downloaded CSV into a well-formatted data.frame and visualize the time series for "data science" in a plot.
+
+```{r eval=FALSE}
+rD <- rsDriver()
+remDr <- rD[["client"]]
+
+url <- "https://trends.google.com/trends/"
+remDr$navigate(url)
+
+# Data Science
+xpath1 <-'//*[@id="input-0"]'
+
+searchElem <- remDr$findElement(using = 'xpath', value = xpath1)
+
+searchTerm <- searchElem$sendKeysToActiveElement(list("data science"))
+
+resultsPage <- searchElem$sendKeysToActiveElement(list(key="enter"))
+
+# Rocket Science
+xpath2 <- '//*[@id="explorepage-content-header"]/explore-pills/div/button'
+
+compareElem <- remDr$findElement(using = 'xpath', value = xpath2) 
+clickTo <- compareElem$clickElement()
+
+compareTerm <- compareElem$sendKeysToActiveElement(list("rocket science"))
+
+resultsPage <- compareElem$sendKeysToActiveElement(list(key="enter"))
+
+# Download CSV
+xpath3 <- '/html/body/div[2]/div[2]/div/md-content/div/div/div[1]/trends-widget/ng-include/widget/div/div/div/widget-actions/div/button[1]'
+
+export <- remDr$findElement(using = 'xpath', value = xpath3)
+
+dl <- export$clickElement()
+
+output <- remDr$getPageSource(header = TRUE)
+
+names(output)
+
+DOM <- remDr$getPageSource(header = TRUE)
+
+write(DOM[[1]], file = "googletrend_DataScience.html")
+
+# close connection
+remDr$closeServer()
+```
+
+```{r message=FALSE, warning=FALSE}
+
+d <- read_csv("multiTimeline.csv", skip=2)
+
+p <- ggplot(d, aes(d$Woche, d$`data science: (Weltweit)`)) +
+  geom_line(color = "green") +
+  geom_point() + 
+  xlab("Week") +
+  ylab("data science (worldwide)") +
+  ggtitle("Google Trends: Interest over time for search term 'data science'")
+
+ggplotly(p)
+
+```
+
+### 2. Writing your own robots.txt file
+
+Write your own robots.txt file providing the following rules:
+
+a. The Googlebot is not allowed to crawl your website. b. Scraping your /private/ folder is generally not allowed. c. The Openbot is allowed to crawl the `/private/images folder at a crawl-delay rate of 1 second. d. You leave a comment in the txt that asks people interested in crawling the page to get in touch with you via your (fictional) email address.
+
+Use the following text box to document your file:
+```{r eval=FALSE}
+
+http://example.com/robots.txt
+
+User-agent: Googlebot
+Disallow: /
+
+User-agent: *
+Disallow: /private/
+  
+User-agent: Openbot
+Allow: /private/images
+crawl-delay: 1
+
+# If interested in crawling this page, please get in touch with the webmaster at webmaster@example.com
+```
+
+#### 3. Working with the robotstxt package
+
+Inform yourself about the robotstxt package and install it. Using this package, solve the following tasks:
+  
+a. Load the package. Then, use package functions to retrieve the robots.txt from the washingtonpost.com website and to parse the file. b. Provide a list of User-agents that are addressed in the robots.txt. c. Using the data that is provided in the parsed robots.txt, check which bot has the most "Disallows"! d. Check whether a generic bot is allowed to crawl data from the following directories:"/todays_paper/","/jobs/", and "/politics/".
+
+```{r}
+
+r_text <- get_robotstxt("https://www.washingtonpost.com") 
+r_parsed <- parse_robotstxt(r_text)
+names(r_parsed)
+r_parsed$useragents
+table(r_parsed$permissions$useragent, r_parsed$permissions$field)
+```
+Generic bots (*) have the most "Disallows"
+
+```{r}
+paths_allowed(
+  paths  = c("/todays_paper/","/jobs/","/politics/"), 
+  domain = "https://www.washingtonpost.com",
+  bot    = "*"
+)
+```
